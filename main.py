@@ -56,6 +56,116 @@ def learn_and_display_SVM(datafile, kernel_type='rbf', C_value=1.0, s_value=1.0)
     plt.pcolormesh(xx1, xx2, Z, cmap=plt.cm.PRGn, vmin=-2, vmax=2)
     st.pyplot(fig)
 
+def evaluate_classifier_rbf(alpha, x, y, index, b, s_value):
+    total = np.sum(alpha*y*np.exp(-1*np.sum((x[:,:]-x[index,:])**2, axis=1)/ (s_value**2))) + b
+    if total > 0:
+        return 1
+    else:
+        return -1
+
+def evaluate_classifier_quad(alpha, x, y, index, b, s_value):
+    total = np.sum(alpha*y*(np.dot(x[:,:], x[index,:])+1)**2) +b
+    if total >0:
+        return 1
+    else:
+        return -1
+
+def evaluate_classifier_rbf_1(w, x, y,pt, b, s_value):
+    total = np.sum(w*y*np.exp(-1*np.sum((x[:,:]-pt)**2, axis=1)/ (s_value**2))) + b
+    if total > 0:
+        return 1
+    else:
+        return -1
+    
+def evaluate_classifier_quad_1(alpha, x, y, pt, b, s_value):
+    total = np.sum(alpha*y*(np.dot(x[:,:], pt)+1)**2) +b
+    if total >0:
+        return 1
+    else:
+        return -1
+
+def train_perceptron(kernel_type="rbf", x=None,y=None,s_value=1, n_iters=100):
+    n,d = x.shape
+    alpha = np.zeros((n,))
+    b = 0
+    done = False
+    converged = True
+    iters = 0
+    np.random.seed(None)
+    if kernel_type == "rbf":
+        while not(done):
+            done = True
+            I = np.random.permutation(n)
+            for i in range(n):
+                j = I[i]
+                if (evaluate_classifier_rbf(alpha, x, y , j, b, s_value) != y[j]):
+                    alpha[j] = alpha[j] +1
+                    b = b + y[j]
+                    done = False
+            iters = iters + 1
+            if iters > n_iters:
+                done = True
+                converged = False
+    elif kernel_type == "quadratic":
+        while not(done):
+            done = True
+            I = np.random.permutation(n)
+            for i in range(n):
+                j = I[i]
+                if (evaluate_classifier_quad(alpha, x, y , j, b, s_value) != y[j]):
+                    alpha[j] = alpha[j] +1
+                    b = b + y[j]
+                    done = False
+            iters = iters + 1
+            if iters > n_iters:
+                done = True
+                converged = False
+    if converged:
+        st.text(f"Perceptron algorithm: iterations until convergence: {iters}")
+    else:
+        st.text("Perceptron algorithm: did not converge within the specified number of iterations")
+    return alpha, b, converged
+
+def learn_and_display_Perception(datafile, kernel_type, s_value, n_iters):
+    data = datafile
+    x = data[:,0:2]
+    y= data[:,2]
+    x1min = min(x[:,0]) - 1
+    x1max = max(x[:,0]) + 1
+    x2min = min(x[:,1]) - 1
+    x2max = max(x[:,1]) + 1
+    fig, ax = plt.subplots()
+    plt.xlim(x1min,x1max)
+    plt.ylim(x2min,x2max)
+    # Plot the data points
+    plt.plot(x[(y==1),0], x[(y==1),1], 'ro')
+    plt.plot(x[(y==-1),0], x[(y==-1),1], 'k^')
+
+    if kernel_type == "rbf":
+        w , b, converged = train_perceptron("rbf",x,y, s_value, n_iters)
+        # Construct a grid of points at which to evaluate the classifier
+        if converged:
+            grid_spacing = 0.05
+            xx1, xx2 = np.meshgrid(np.arange(x1min, x1max, grid_spacing), np.arange(x2min, x2max, grid_spacing))
+            grid = np.c_[xx1.ravel(), xx2.ravel()]
+            Z = np.array([evaluate_classifier_rbf_1(w, x, y,pt, b, s_value) for pt in grid])
+            # Show the classifier's boundary using a color plot
+            Z = Z.reshape(xx1.shape)
+            plt.pcolormesh(xx1, xx2, Z, cmap=plt.cm.PRGn, vmin=-3, vmax=3)
+        st.pyplot(fig)
+    if kernel_type == 'quadratic':
+        w , b, converged = train_perceptron("quadratic", x,y, s_value, n_iters)
+        # Construct a grid of points at which to evaluate the classifier
+        if converged:
+            grid_spacing = 0.05
+            xx1, xx2 = np.meshgrid(np.arange(x1min, x1max, grid_spacing), np.arange(x2min, x2max, grid_spacing))
+            grid = np.c_[xx1.ravel(), xx2.ravel()]
+            Z = np.array([evaluate_classifier_quad_1(w, x, y,pt , b, s_value) for pt in grid])
+            # Show the classifier's boundary using a color plot
+            Z = Z.reshape(xx1.shape)
+            plt.pcolormesh(xx1, xx2, Z, cmap=plt.cm.PRGn, vmin=-3, vmax=3)
+        st.pyplot(fig)
+
 def rand2sym(vec, cdf, sym):
     """ Transform an array of random numbers, distributed uniformly in [0,1]
     into a sequence of symbols, chosen according to the probabilities defined by c (cumul of p)"""
@@ -106,8 +216,10 @@ def probability_plot(possible_output, n):
     plt.legend()
     st.pyplot(fig)
 
-
-st.sidebar.title("Control Panel")
+st.sidebar.title("David Cheung's Website")
+st.text("")
+st.text("")
+st.sidebar.header("Control Panel")
 main_control = st.sidebar.selectbox("Directory", options=["Main", "Probability", "Statistics", "Machine Learning"])
 
 if main_control == "Main":
@@ -142,39 +254,62 @@ elif main_control == "Machine Learning":
         if selected_data_set_SVM == "1":
             data_SVM = get_data_SVM(1)
             kernel_function = selected_kernel_function = st.selectbox("Select", ["quadratic", "rbf"])
-            # st.dataframe(data_SVM)
-            c = st.slider("c value", min_value=0.1, max_value=100.)
+            c = st.slider("c value", min_value=0.01, max_value=30.)
             s = st.slider("s value", min_value = 0.01, max_value=20.)
             learn_and_display_SVM(data_SVM, kernel_function, c, s)
         elif selected_data_set_SVM == "2":
             data_SVM = get_data_SVM(2)
             kernel_function = selected_kernel_function = st.selectbox("Select", ["quadratic", "rbf"])
-            # st.dataframe(data_SVM)
-            c = st.slider("c value", min_value=0.1, max_value=100.)
+            c = st.slider("c value", min_value=0.01, max_value=30.)
             s = st.slider("s value", min_value = 0.01, max_value=20.)
             learn_and_display_SVM(data_SVM, kernel_function, c, s)
         elif selected_data_set_SVM == "3":
             data_SVM = get_data_SVM(3)
             kernel_function = selected_kernel_function = st.selectbox("Select", ["quadratic", "rbf"])
-            # st.dataframe(data_SVM)
-            c = st.slider("c value", min_value=0.1, max_value=100.)
+            c = st.slider("c value", min_value=0.01, max_value=30.)
             s = st.slider("s value", min_value = 0.01, max_value=20.)
             learn_and_display_SVM(data_SVM, kernel_function, c, s)
         elif selected_data_set_SVM == "4":
             data_SVM = get_data_SVM(4)
             kernel_function = selected_kernel_function = st.selectbox("Select", ["quadratic", "rbf"])
-            # st.dataframe(data_SVM)
-            c = st.slider("c value", min_value=0.1, max_value=100.)
+            c = st.slider("c value", min_value=0.01, max_value=30.)
             s = st.slider("s value", min_value = 0.01, max_value=20.)
             learn_and_display_SVM(data_SVM, kernel_function, c, s)
         elif selected_data_set_SVM == "5":
             data_SVM = get_data_SVM(5)
             kernel_function = selected_kernel_function = st.selectbox("Select", ["quadratic", "rbf"])
-            # st.dataframe(data_SVM)
-            c = st.slider("c value", min_value=0.1, max_value=100.)
+            c = st.slider("c value", min_value=0.01, max_value=30.)
             s = st.slider("s value", min_value = 0.01, max_value=20.)
             learn_and_display_SVM(data_SVM, kernel_function, c, s)
         else:
             pass
-
+    elif selected_ml == "Perceptron":
+        selected_data_set_Perceptron = st.selectbox("""Please select a specific data set""", ["Select","1", "2", "3", "4", "5"])
+        if selected_data_set_Perceptron == "1":
+            data_Per = get_data_SVM(1)
+            kernel_function = selected_kernel_function = st.selectbox("Select", ["quadratic", "rbf"])
+            s = st.slider("s value", min_value = 0.01, max_value=20.)
+            learn_and_display_Perception(data_Per, kernel_function, s, 3500)
+        elif selected_data_set_Perceptron == "2":
+            data_Per = get_data_SVM(2)
+            kernel_function = selected_kernel_function = st.selectbox("Select", ["quadratic", "rbf"])
+            s = st.slider("s value", min_value = 0.01, max_value=20.)
+            learn_and_display_Perception(data_Per, kernel_function, s, 3500)
+        elif selected_data_set_Perceptron == "3":
+            data_Per = get_data_SVM(3)
+            kernel_function = selected_kernel_function = st.selectbox("Select", ["quadratic", "rbf"])
+            s = st.slider("s value", min_value = 0.01, max_value=20.)
+            learn_and_display_Perception(data_Per, kernel_function, s, 3500)
+        elif selected_data_set_Perceptron == "4":
+            data_Per = get_data_SVM(4)
+            kernel_function = selected_kernel_function = st.selectbox("Select", ["quadratic", "rbf"])
+            s = st.slider("s value", min_value = 0.01, max_value=20.)
+            learn_and_display_Perception(data_Per, kernel_function, s, 3500)
+        elif selected_data_set_Perceptron == "5":
+            data_Per = get_data_SVM(5)
+            kernel_function = selected_kernel_function = st.selectbox("Select", ["quadratic", "rbf"])
+            s = st.slider("s value", min_value = 0.01, max_value=20.)
+            learn_and_display_Perception(data_Per, kernel_function, s, 3500)
+        else:
+            pass
         
