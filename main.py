@@ -3,12 +3,55 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.svm import SVC
-
+from scipy.stats import multivariate_normal
 
 @st.cache
 def get_data_SVM(data_num):
     url = f"./data/data{str(data_num)}.txt"
     return np.loadtxt(url)
+
+def bivariate_plot(var1, var2, corr, n):
+    #
+    # Set parameters of Gaussian
+    mu = [0,0]
+    covariance = corr * np.sqrt(var1) * np.sqrt(var2)
+    sigma = [[var1,covariance], [covariance,var2]]
+    np.set_printoptions(precision=2)
+    print("Covariance matrix:")
+    print(np.around(sigma, decimals=2))
+    #
+    # Draw samples from the distribution
+    n = n
+    x = np.random.multivariate_normal(mu,sigma,size=n)
+    #
+    # Set up a plot for the samples and the density contours
+    lim = 10.0
+    fig, ax = plt.subplots()
+    plt.xlim(-lim, lim) # limit along x1-axis
+    plt.ylim(-lim, lim) # limit along x2-axis    
+    plt.axes().set_aspect('equal', 'datalim')
+    #
+    # Plot the sampled points as blue dots
+    plt.plot(x[:,0], x[:,1], 'bo')
+    #
+    # To display contour lines, first define a fine grid
+    res = 200
+    xg = np.linspace(-lim, lim, res)
+    yg = np.linspace(-lim, lim, res)
+    z = np.zeros((res,res))
+    # Compute the density at each grid point
+    rv = multivariate_normal(mean=mu, cov=sigma)
+    for i in range(0,res):
+        for j in range(0,res):
+            z[j,i] = rv.logpdf([xg[i], yg[j]]) 
+    sign, logdet = np.linalg.slogdet(sigma)
+    normalizer = -0.5 * (2 * np.log(6.28) + sign * logdet)
+    # Now plot a few contour lines of the density
+    for offset in range(1,4):
+        plt.contour(xg,yg,z, levels=[normalizer - offset], colors='r', linewidths=2.0, linestyles='solid')
+
+    # Finally, display
+    st.pyplot(fig)
 
 def learn_and_display_SVM(datafile, kernel_type='rbf', C_value=1.0, s_value=1.0):
     data = datafile
@@ -312,4 +355,20 @@ elif main_control == "Machine Learning":
             learn_and_display_Perception(data_Per, kernel_function, s, 3500)
         else:
             pass
-        
+    elif selected_ml == "Bivariate Gaussian":
+        # var1 = st.slider("var1", min_value=0.5, max_value=9.9)
+        # var2 = st.slider("var2", min_value=0.5, max_value=9.9)
+        # corr = st.slider("corr", min_value=-1., max_value=1., value=0.)
+        # bivariate_plot(var1, var2, corr)
+        pass
+
+elif main_control == "Statistics":
+    st.title("Statistics")
+    st.text("""For the Linear/ Quadratic Discriminant Analysis, understanding the mathematic is of ulmost importance,
+    discriminant analysis requries corvariance matrix, means of different classes, in this demonstration, 
+    we set mu as 0 for two variables""")
+    var1 = st.slider("var1", min_value=0.5, max_value=9.9, value=5.)
+    var2 = st.slider("var2", min_value=0.5, max_value=9.9, value=5.)
+    corr = st.slider("corr", min_value=-1., max_value=1., value=0.)
+    n =  st.slider("n", min_value=30, max_value=400, value=100)
+    bivariate_plot(var1, var2, corr, n)
